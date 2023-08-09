@@ -40,7 +40,9 @@ fold5 for uniformer-small and its confusion matrix as follows
 
 ![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold5_confusion_matrix_small.png)
 
-second we use all trainval data to chose a model between 100 and 200 epochs based on previous training experience, There will be some randomness, and we will give the model weight of the competition submission
+second 
+
+we use all trainval data to chose a model between 100 and 200 epochs based on previous training experience, There will be some randomness, and we will give the model weight of the competition submission
 
 # Evaluation
 The first output json is ensemble model
@@ -56,3 +58,8 @@ just change --model and --checkpoint
 finally we will get the final json by post-processing 2 model outputs using
 
     postprocess/json_refine.py
+
+# Pretrained model
+The pretrained model can be downloaded by:
+
+https://drive.google.com/drive/folders/1kyspifcbd48-5FFnkJ9rgUZxIEUq8278?usp=drive_link
