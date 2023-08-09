@@ -10,7 +10,7 @@ We provide our own txt files about five-fold cross-validation in ./data
 
 The command for training is
 
-bash train.sh
+    bash train.sh
 
 Modifications of the relevant parameters can be implemented in the train.sh file
 
@@ -45,8 +45,14 @@ second we use all trainval data to chose a model between 100 and 200 epochs base
 # Evaluation
 The first output json is ensemble model
 
+command
+
+    predict_submit.py --data_dir {your data path} --val_anno_file root_dir/labels_test_inaccessible.txt --model uniformer_base_original uniformer_small_original uniformer_small_original uniformer_base_original uniformer_base_original uniformer_small_original --checkpoint {fold1.pth.tar fold2.pth.tar fold3.pth.tar fold3.pth.tar fold4.pth.tar fold5.pth.tar} --batch-size 1 --results-dir {your result dir} --team_name {your name} --img_size 16 128 128 --crop_size 14 112 112
+
 The second output json is the model trained by all trainval data
+
+just change --model and --checkpoint
 
 finally we will get the final json by post-processing 2 model outputs using
 
-postprocess/json_refine.py
+    postprocess/json_refine.py
