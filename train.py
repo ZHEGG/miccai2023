@@ -44,8 +44,11 @@ except ImportError:
     has_wandb = False
 
 from metrics import *
-from datasets.mp_liver_dataset import MultiPhaseLiverDataset, create_loader
+from datasets.mp_liver_dataset import MultiPhaseLiverDataset, create_loader, create_balanced_sample_dataloader
 import models
+
+import csv
+from losses.cb_loss import ClassBalancedLoss
 
 torch.backends.cudnn.benchmark = True
 _logger = logging.getLogger('train')
@@ -73,9 +76,15 @@ parser.add_argument('--flip_prob', default=0.5, type=float, help='Random flip pr
 parser.add_argument('--reprob', type=float, default=0.25, help='Random erase prob (default: 0.25)')
 parser.add_argument('--rcprob', type=float, default=0.25, help='Random contrast prob (default: 0.25)')
 parser.add_argument('--angle', default=45, type=int)
+parser.add_argument('--sampling', type=str, default='instance', help='sampling mode (instance, class, sqrt, prog)')
+parser.add_argument('--mode', type=str, default='trilinear', help='interpolate mode (trilinear, tricubic)')
+parser.add_argument('--return_visualization', action='store_true', default=False, help='if return_visualization')
+parser.add_argument('--mixup', action='store_true', default=False, help='if use intra-class mixup')
+parser.add_argument('--return_glb', action='store_true', default=False, help='if return_glb_input')
+parser.add_argument('--return_hidden', action='store_true', default=False, help='if return_model_hidden')
 
 # Model parameters
-parser.add_argument('--model', default='mp_uniformer_small', type=str, metavar='MODEL',
+parser.add_argument('--model', default='uniformer_small_IL', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
 parser.add_argument('--pretrained', action='store_true', default=False,
                     help='Start with pretrained version of specified network (if avail)')
@@ -165,6 +174,8 @@ parser.add_argument('--drop-path', type=float, default=None, metavar='PCT',
                     help='Drop path rate (default: None)')
 parser.add_argument('--drop-block', type=float, default=None, metavar='PCT',
                     help='Drop block rate (default: None)')
+parser.add_argument('--cb_loss', action='store_true', default=False,
+                    help='if use cb_loss')
 
 # Batch norm parameters (only works with gen_efficientnet based models currently)
 parser.add_argument('--bn-tf', action='store_true', default=False,
@@ -213,7 +224,7 @@ parser.add_argument('--output', default='', type=str, metavar='PATH',
                     help='path to output folder (default: none, current dir)')
 parser.add_argument('--experiment', default='', type=str, metavar='NAME',
                     help='name of train experiment, name of sub-folder for output')
-parser.add_argument('--eval-metric', default='f1', type=str, metavar='EVAL_METRIC',
+parser.add_argument('--eval-metric', default='f1', type=str, nargs='+', metavar='EVAL_METRIC',
                     help='Main metric (default: "f1"')
 parser.add_argument('--report-metrics', default=['acc', 'f1', 'recall', 'precision', 'kappa'], 
                     nargs='+', choices=['acc', 'f1', 'recall', 'precision', 'kappa'], 
@@ -293,6 +304,7 @@ def main():
         args.model,
         pretrained=args.pretrained,
         num_classes=args.num_classes,
+        img_size = args.crop_size[-1],
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         drop_block_rate=args.drop_block,
@@ -300,7 +312,7 @@ def main():
         bn_eps=args.bn_eps,
         scriptable=args.torchscript,
         checkpoint_path=args.initial_checkpoint)
-
+    
     if args.num_classes is None:
         assert hasattr(model, 'num_classes'), 'Model must have `num_classes` attr if not set on cmd line/config.'
         args.num_classes = model.num_classes  # FIXME handle model default vs config num_classes more elegantly
@@ -375,7 +387,7 @@ def main():
         else:
             if args.local_rank == 0:
                 _logger.info("Using native Torch DistributedDataParallel.")
-            model = NativeDDP(model, device_ids=[args.local_rank], broadcast_buffers=not args.no_ddp_bb)
+            model = NativeDDP(model, device_ids=[args.local_rank], broadcast_buffers=not args.no_ddp_bb,find_unused_parameters=True)
         # NOTE: EMA model does not need to be wrapped by DDP
 
     # setup learning rate schedule and starting epoch
@@ -395,29 +407,46 @@ def main():
     # create the train and eval datasets/dataloader
     dataset_train = MultiPhaseLiverDataset(args, is_training=True)
 
+    total_class = np.unique(np.array(dataset_train.lab_list))
+    count = []
+    for i in total_class:
+        print("num_class:%s=%s"%(i,len(np.where(np.array(dataset_train.lab_list)==i)[0])))
+        count.append(len(np.where(np.array(dataset_train.lab_list)==i)[0]))
+
     dataset_eval = MultiPhaseLiverDataset(args, is_training=False)
 
     loader_train = create_loader(dataset_train, 
-                                 batch_size=args.batch_size,
-                                 is_training=True,
-                                 num_workers=args.workers,
-                                 distributed=args.distributed,
-                                 pin_memory=args.pin_mem)
+                                batch_size=args.batch_size,
+                                is_training=True,
+                                num_workers=args.workers,
+                                distributed=args.distributed,
+                                pin_memory=args.pin_mem,
+                                mode=args.sampling,
+                                )
     
     loader_eval = create_loader(dataset_eval, 
                                 batch_size=args.batch_size,
                                 is_training=False,
                                 num_workers=args.workers,
                                 distributed=args.distributed,
-                                pin_memory=args.pin_mem)
+                                pin_memory=args.pin_mem,
+                                mode=args.sampling,
+                                )
 
     if args.smoothing:
         if args.bce_loss:
             train_loss_fn = BinaryCrossEntropy(smoothing=args.smoothing, target_threshold=args.bce_target_thresh)
+        elif args.cb_loss:
+            sample = torch.tensor(count)
+            train_loss_fn = ClassBalancedLoss(samples_per_class=sample,num_classes=args.num_classes,is_smoothing=True)
         else:
             train_loss_fn = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
     else:
-        train_loss_fn = nn.CrossEntropyLoss()
+        if args.cb_loss:
+            sample = torch.tensor(count)
+            train_loss_fn = ClassBalancedLoss(samples_per_class=sample,num_classes=args.num_classes)
+        else:
+            train_loss_fn = nn.CrossEntropyLoss()
     train_loss_fn = train_loss_fn.cuda()
     validate_loss_fn = nn.CrossEntropyLoss().cuda()
 
@@ -488,7 +517,15 @@ def main():
 
             if lr_scheduler is not None:
                 # step LR for next epoch
-                lr_scheduler.step(epoch + 1, eval_metrics[eval_metric])
+                if isinstance(eval_metric,list):
+                    eval_metric_value = 0
+                    all_value = [eval_metrics[i] for i in eval_metric]
+                    for i in all_value:
+                        eval_metric_value+=i
+                    eval_metric_value/=len(all_value)
+                    lr_scheduler.step(epoch + 1, eval_metric_value)
+                else:
+                    lr_scheduler.step(epoch + 1, eval_metrics[eval_metric])
 
             if output_dir is not None:
                 update_summary(
@@ -506,13 +543,25 @@ def main():
 
             if saver is not None:
                 # save proper checkpoint with eval metric
-                save_metric = eval_metrics[eval_metric]
+                if isinstance(eval_metric,list):
+                    eval_metric_value = 0
+                    all_value = [eval_metrics[i] for i in eval_metric]
+                    for i in all_value:
+                        eval_metric_value+=i
+                    eval_metric_value/=len(all_value)
+                    save_metric = eval_metric_value
+                else:
+                    save_metric = eval_metrics[eval_metric]
                 best_metric, best_epoch = saver.save_checkpoint(epoch, metric=save_metric)
 
     except KeyboardInterrupt:
         pass
     if best_metric is not None:
         _logger.info('*** Best metric: {0} (epoch {1})'.format(best_metric, best_epoch))
+        with open(os.path.join(output_dir, 'summary.csv'),'a',newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(['最好F1指标-epoch数'])
+            writer.writerow(['*** Best metric: {0} (epoch {1})'.format(best_metric, best_epoch)])
 
 
 def train_one_epoch(
@@ -530,12 +579,25 @@ def train_one_epoch(
     end = time.time()
     last_idx = len(loader) - 1
     num_updates = epoch * len(loader)
-    for batch_idx, (input, target) in enumerate(loader):
+    for batch_idx, item in enumerate(loader):
+        if args.return_glb:
+            input = item[0]
+            target = item[1]
+            global_input = item[2]
+            input, target, global_input = input.cuda(), target.cuda(), global_input.cuda()
+        else:
+            input = item[0]
+            target = item[1]
+            input, target = input.cuda(), target.cuda()
         last_batch = batch_idx == last_idx
         data_time_m.update(time.time() - end)
-        input, target = input.cuda(), target.cuda()
+
         with amp_autocast():
-            output = model(input)
+            if args.model == "uniformer_small_original" or args.model == "uniformer_base_original" or args.model == "uniformer_xs_original" or args.model == "uniformer_xxs_original" :
+                output,visualizations = model(input)
+            else:
+                raise ValueError('invalid model input')
+
             loss = loss_fn(output, target)
 
         if not args.distributed:
@@ -609,13 +671,24 @@ def validate(model, loader, loss_fn, args, amp_autocast=suppress, log_suffix='')
     predictions = []
     labels = []
     last_idx = len(loader) - 1
-    for batch_idx, (input, target) in enumerate(loader):
+    for batch_idx, item in enumerate(loader):
+        if args.return_glb:
+            input = item[0]
+            target = item[1]
+            global_input = item[2]
+            input, target, global_input = input.cuda(), target.cuda(), global_input.cuda()
+        else:
+            input = item[0]
+            target = item[1]
+            input, target = input.cuda(), target.cuda()
         last_batch = batch_idx == last_idx
-        input = input.cuda()
-        target = target.cuda()
 
         with amp_autocast():
-            output = model(input)
+            if args.model == "uniformer_small_original" or args.model == "uniformer_base_original" or args.model == "uniformer_xs_original" or args.model == "uniformer_xxs_original" :
+                output,visualizations = model(input)
+            else:
+                raise ValueError('invalid model input')
+
         if isinstance(output, (tuple, list)):
             output = output[0]
 

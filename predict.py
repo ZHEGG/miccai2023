@@ -17,12 +17,20 @@ from tqdm import tqdm
 from collections import OrderedDict
 from contextlib import suppress
 from torch.utils.data.dataloader import DataLoader
-from timm.models import create_model, apply_test_time_pool, load_checkpoint, is_model, list_models
+from timm.models import create_model, load_checkpoint, is_model, list_models
 from timm.utils import setup_default_logging, set_jit_legacy
+from torchcam.methods import SmoothGradCAMpp
+from torchvision.transforms.functional import to_pil_image
+from matplotlib import cm
+from PIL import Image
+import cv2
 
 import models
 from metrics import *
 from datasets.mp_liver_dataset import MultiPhaseLiverDataset
+
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 has_apex = False
 try:
@@ -94,7 +102,10 @@ parser.add_argument('--results-dir', default='', type=str, metavar='FILENAME',
                     help='Output csv file for validation results (summary)')
 parser.add_argument('--team_name', default='', type=str,
                     required=True, help='Please enter your team name')
-
+parser.add_argument('--mode', type=str, default='trilinear', help='interpolate mode (trilinear, tricubic)')
+parser.add_argument('--return_visualization', action='store_true', default=False, help='if return_visualization')
+parser.add_argument('--return_hidden', action='store_true', default=False, help='if return_model_hidden')
+parser.add_argument('--return_glb', action='store_true', default=False, help='if return_glb_input')
 
 def validate(args):
     # might as well try to validate something
@@ -124,7 +135,9 @@ def validate(args):
         args.model,
         pretrained=args.pretrained,
         num_classes=args.num_classes,
-        pretrained_cfg=None)
+        pretrained_cfg=None,
+        return_visualization=args.return_visualization,
+        return_hidden = args.return_hidden)
 
     if args.num_classes is None:
         assert hasattr(
@@ -155,21 +168,122 @@ def validate(args):
 
     predictions = []
     labels = []
+    patient_ids = []
+    embedding_list_test = []
 
     model.eval()
+    # cam_extractor = SmoothGradCAMpp(model,target_layer=model.blocks2[-1].mlp,input_shape=(8,14,112,112))
+
     pbar = tqdm(total=len(dataset))
     with torch.no_grad():
-        for (input, target) in (loader):
-            target = target.cuda()
-            input = input.cuda()
+        for batch_idx, item in enumerate(loader):
+            if args.return_glb:
+                input = item[0]
+                target = item[1]
+                global_input = item[2]
+                patient_id = item[-1]
+                input, target, global_input = input.cuda(), target.cuda(), global_input.cuda()
+            else:
+                input = item[0]
+                target = item[1]
+                patient_id = item[-1]
+                input, target = input.cuda(), target.cuda()
+            patient_id = list(patient_id)
             # compute output
             with amp_autocast():
-                output = model(input)
+                if args.model == "uniformer_small_original" or args.model == "uniformer_base_original" or args.model == "uniformer_xs_original" or args.model == "uniformer_xxs_original" :
+                    output,visualizations = model(input)
+                else:
+                    raise ValueError('invalid model input')
+
+                ####################activate_map####################
+                # for img_idx in range(input.shape[0]):
+                #     activate_map = cam_extractor(target[img_idx].item(),output[img_idx]) # N,Z,H,W
+                #     for modal in range(input.shape[1]):
+                #         cur_img = input[img_idx][modal] # Z,H,W
+                #         for z in range(input.shape[2]):
+                #             cur_img_z = cur_img[z]
+                #             cur_img_z = cur_img_z.cpu().numpy()
+                #             cur_img_z = np.repeat(cur_img_z[:, :, np.newaxis], 3, axis=-1)
+                #             cur_img_z = (cur_img_z-cur_img_z.min())/(cur_img_z.max()-cur_img_z.min())
+                #             cur_img_z = (cur_img_z * 255).astype(np.uint8)
+                #             mask = to_pil_image(activate_map[0][img_idx][z], mode='F')
+                #             cmap = cm.get_cmap('jet')
+                #             overlay = mask.resize(cur_img_z.shape[:2], resample=Image.BICUBIC)
+                #             overlay = (255 * cmap(np.asarray(overlay) ** 2)[:, :, :3]).astype(np.uint8).transpose(1,0,2)[:,:,::-1]
+
+                #             out_img = cur_img_z*0.5+overlay*0.5
+
+                #             concat_img = np.concatenate([cur_img_z,overlay,out_img],axis=1)
+                #             cv2.imwrite('/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/vis/vis_att_%s_%s.jpg'%(img_idx,z),concat_img)
+
+                ####################attention####################
+                # multi_head_attn_map = visualizations[0] #N,head_num,Z,H,W
+                # for img_idx in range(input.shape[0]):
+                #     for modal in range(input.shape[1]):
+                #         cur_img = input[img_idx][modal] # Z,H,W
+                #         for head in range(multi_head_attn_map.shape[1]):
+                #             cur_head_attn_map = multi_head_attn_map[img_idx][head] # Z,H,W
+                #             for z in range(input.shape[2]):
+                #                 cur_img_z = cur_img[z]
+                #                 cur_img_z = cur_img_z.cpu().numpy()
+                #                 cur_img_z = np.repeat(cur_img_z[:, :, np.newaxis], 3, axis=-1)
+                #                 cur_img_z = (cur_img_z-cur_img_z.min())/(cur_img_z.max()-cur_img_z.min())
+                #                 cur_img_z = (cur_img_z * 255).astype(np.uint8)
+                #                 mask = to_pil_image(cur_head_attn_map[z], mode='F')
+                #                 cmap = cm.get_cmap('jet')
+                #                 overlay = mask.resize(cur_img_z.shape[:2], resample=Image.BICUBIC)
+                #                 overlay = (255 * cmap(np.asarray(overlay) ** 2)[:, :, :3]).astype(np.uint8).transpose(1,0,2)[:,:,::-1]
+
+                #                 out_img = cur_img_z*0.5+overlay*0.5
+
+                #                 concat_img = np.concatenate([cur_img_z,overlay,out_img],axis=1)
+                #                 cv2.imwrite('/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/vis/att_imgid_%s_headnum_%s_z_%s.jpg'%(img_idx,head,z),concat_img)
+                
             predictions.append(output)
             labels.append(target)
+            patient_ids.extend(patient_id)
             pbar.update(args.batch_size)
         pbar.close()
+
+        if args.return_hidden:
+            labels_total_ = torch.cat(labels[:-1]).reshape(-1)
+            labels_total_ = torch.cat([labels_total_,labels[-1]])
+            print("Computing t-SNE embedding")
+            X_embedding = np.concatenate(embedding_list_test, axis=0)
+            tsne2d = TSNE(n_components=2, init='pca', random_state=0)
+
+            X_tsne_2d = tsne2d.fit_transform(X_embedding)
+            plot_embedding_2d(X_tsne_2d[:,0:2],labels_total_.cpu().detach().numpy(),"t-SNE 2D",args.results_dir)
+    
+    false_idx,false_pred_idx = pick_false_sample(predictions,labels)
+    pred_false_patients = np.array(patient_ids)[false_idx].tolist()
+    false_idx_label = torch.cat(labels).detach().cpu().numpy()[false_idx].tolist()
+    false_pred_idx = false_pred_idx.tolist()
+    pred_false_patients_dict = {k:(v1,v2) for k,v1,v2 in zip(pred_false_patients,false_idx_label,false_pred_idx)}
+    print(pred_false_patients_dict)
+    with open(os.path.join(args.results_dir,'pred_false_idxs.txt'),'w') as f_w:
+        for k,v in pred_false_patients_dict.items():
+            f_w.writelines('%s\t%s\t%s\n'%(k,v[0],v[1]))
+
+    evaluation_metrics,confusion_matrix = compute_metrics(predictions,labels,args)
+    print(confusion_matrix)
+
+    output_str = 'Test:\n'
+    for key, value in evaluation_metrics.items():
+        output_str += f'{key}: {value}\n'
+    _logger.info(output_str)
+    
     return process_prediction(predictions)
+
+def pick_false_sample(predictions,labels):
+    pred = process_prediction(predictions)
+    idx = np.argmax(pred,axis=-1)
+    labels = torch.cat(labels, dim=0).detach()
+    labels = labels.cpu().numpy()
+    false_idx = np.where(idx!=labels)[0]
+
+    return false_idx,idx[false_idx]
 
 
 def process_prediction(outputs):
@@ -199,6 +313,57 @@ def write_score2json(score_info, args):
     file.close()
     _logger.info(f"Prediction has been saved to '{save_name}'.")
 
+def compute_metrics(outputs, targets, args):
+    
+    outputs = torch.cat(outputs, dim=0).detach()
+    targets = torch.cat(targets, dim=0).detach()
+
+    outputs = outputs.cpu().numpy()
+    targets = targets.cpu().numpy()
+    acc = ACC(outputs, targets)
+    f1 = F1_score(outputs, targets)
+    recall = Recall(outputs, targets)
+    # specificity = Specificity(outputs, targets)
+    precision = Precision(outputs, targets)
+    kappa = Cohen_Kappa(outputs, targets)
+    confusion_matrix_result = confusion_matrix(outputs, targets)
+    metrics = OrderedDict([
+        ('acc', acc),
+        ('f1', f1),
+        ('recall', recall),
+        ('precision', precision),
+        ('kappa', kappa),
+    ])
+    
+    num_classes = np.unique(targets)
+    for i in num_classes:
+        index = np.where(targets==i)
+        cur_outputs = outputs[index]
+        cur_targets = targets[index]
+        acc = ACC(cur_outputs, cur_targets)
+        print('class:%s,acc=%s'%(i,acc))
+
+    return metrics,confusion_matrix_result
+
+def plot_embedding_2d(X, y, title=None, save_path=None):
+    """Plot an embedding X with the class label y colored by the domain d."""
+    x_min, x_max = np.min(X, 0), np.max(X, 0)
+    X = (X - x_min) / (x_max - x_min)
+
+    # Plot colors numbers
+    plt.figure(figsize=(10,10))
+    ax = plt.subplot(111)
+    for i in range(X.shape[0]):
+        # plot colored number
+        plt.text(X[i, 0], X[i, 1], str(y[i]),
+                 color=plt.cm.Set3(y[i] / 7.),
+                 fontdict={'weight': 'bold', 'size': 9})
+
+    plt.xticks([]), plt.yticks([])
+    if title is not None:
+        plt.title(title)
+    # plt.show()
+    plt.savefig(os.path.join(save_path,'tsne.png'))
 
 def main():
     setup_default_logging()

@@ -1,0 +1,60 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "predict_submit_multimodel",
+            "type": "python",
+            "request": "launch",
+            "program": "predict_submit.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--data_dir",
+                "/home/mdisk3/bianzhewu/dataset/医疗数据集/miccai2023_test/classification_dataset/images",
+                "--val_anno_file",
+                "/home/mdisk3/bianzhewu/dataset/医疗数据集/miccai2023_test/classification_dataset/labels/labels_test_inaccessible.txt",
+                "--model",
+                // #######################cur best########################
+                // "uniformer_base_original",
+                // "uniformer_small_original",
+                // "uniformer_small_original",
+                // "uniformer_base_original",
+                // "uniformer_base_original",
+                // "uniformer_small_original",
+                // #######################cur best########################
+
+                "--batch-size",
+                "1",
+                "--checkpoint",
+                // #######################cur best########################
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/oversample-sqrt-pretrained-uniformer_base_original-mixup-excluded6-cbloss-smooth-aug-drop_0.1-trainval-fold1/model_best.pth.tar",
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/oversample-sqrt-pretrained-uniformer_small_original-mixup-excluded6-cbloss-smooth-aug-drop_0.1-trainval-fold2/model_best.pth.tar",
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/oversample-sqrt-pretrained-uniformer_small_original-mixup-excluded6-cbloss-smooth-aug-drop_0.1-trainval-fold3/model_best.pth.tar",
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/oversample-sqrt-pretrained-uniformer_base_original-mixup-excluded6-cbloss-smooth-aug-drop_0.1-trainval-fold3/model_best.pth.tar",
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/oversample-sqrt-pretrained-uniformer_base_original-mixup-excluded6-cbloss-smooth-aug-drop_0.1-trainval-fold4/model_best.pth.tar",
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/oversample-sqrt-pretrained-uniformer_small_original-mixup-excluded6-cbloss-smooth-aug-drop_0.1-trainval-fold5/model_best.pth.tar",
+                // #######################cur best########################
+                
+                "--results-dir",
+                "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/predict_multimodel_submit_v16",
+                "--team_name",
+                "WorkingisAllyouneed",
+                "--img_size",
+                "16",
+                "128",
+                "128",
+                "--crop_size",
+                "14",
+                "112",
+                "112",
+            ],
+            "cwd": "/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "5"
+            },
+        },
+    ]
+}

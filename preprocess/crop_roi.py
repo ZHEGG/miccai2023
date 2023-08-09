@@ -78,26 +78,31 @@ def crop_lesion(data_dir, json_path, save_dir, xy_extension=16, z_extension=2):
                 if temp_image.shape[0] == 1:
                     roi = temp_image[0, y_min:y_max, x_min:x_max]
                     roi = np.expand_dims(roi, axis=0)
+                    img_global = temp_image
                 elif z_min == z_max:
                     roi = temp_image[z_min, y_min:y_max, x_min:x_max]
                     roi = np.expand_dims(roi, axis=0)
+                    img_global = temp_image[z_min,:]
                 else:
                     roi = temp_image[z_min:(z_max+1), y_min:y_max, x_min:x_max]
+                    img_global = temp_image[z_min:(z_max+1), :]
 
                 if xy_extension is not None:
                     roi = np.pad(roi, ((0, 0), (y_padding_min, y_padding_max), (x_padding_min, x_padding_max)), 'constant')
                 
                 nii_file = sitk.GetImageFromArray(roi)
+                nii_img_global = sitk.GetImageFromArray(img_global)
                 if int(ann_idx) == 0:
                     save_folder = os.path.join(save_dir, f'{patientID}')
                 else:
                     save_folder = os.path.join(save_dir, f'{patientID}_{ann_idx}')
                 os.makedirs(save_folder, exist_ok=True)
                 sitk.WriteImage(nii_file, save_folder + f'/{phase}.nii.gz')
+                sitk.WriteImage(nii_img_global, save_folder + f'/{phase}_glb.nii.gz')
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='Data preprocessing Config', add_help=False)
+    config_parser = parser = argparse.ArgumentParser(description='Data preprocessing Config', add_help=False)
     parser.add_argument('--data-dir', default='', type=str)
     parser.add_argument('--anno-path', default='', type=str)
     parser.add_argument('--save-dir', default='', type=str)

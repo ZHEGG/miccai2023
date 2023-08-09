@@ -1,1 +1,1 @@
-from .uniformer import uniformer_small_IL
+from .uniformer import uniformer_small_original,uniformer_base_original,uniformer_xs_original,uniformer_xxs_original
