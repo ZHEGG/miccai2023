@@ -192,7 +192,11 @@ def validate(args):
             # compute output
             with amp_autocast():
                 if args.model == "uniformer_small_original" or args.model == "uniformer_base_original" or args.model == "uniformer_xs_original" or args.model == "uniformer_xxs_original" :
-                    output,visualizations = model(input)
+                    if args.return_hidden:
+                        output,visualizations,model_hidden = model(input)
+                        embedding_list_test.append(model_hidden.cpu().detach().numpy())
+                    else:
+                        output,visualizations = model(input)
                 else:
                     raise ValueError('invalid model input')
 

@@ -5,6 +5,8 @@ Please refer to miccai2023 for data preparation and processing: https://github.c
 # Overview
 Our method integrates multiple models trained by cross-validation, and each model use class-balanced loss, oversampling strategy and data augment to alleviate the problems of data imbalance and overfitting in this competition
 
+![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/pipeline.png)
+
 # Train
 We provide our own txt files about five-fold cross-validation in ./data
 
@@ -63,3 +65,7 @@ finally we will get the final json by post-processing 2 model outputs using
 The pretrained model can be downloaded by:
 
 https://drive.google.com/drive/folders/1kyspifcbd48-5FFnkJ9rgUZxIEUq8278?usp=drive_link
+
+The pretrained model for uniformer all can be found in:
+
+https://github.com/Sense-X/UniFormer/tree/main/video_classification
