@@ -47,8 +47,8 @@ def combine_multimodel(json_dict1,json_dict2,results_dir,team_name = 'workingisa
     file.close()
 
 if __name__ == "__main__":
-    json_predict_file = os.path.join('/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/predict_multimodel_submit/ensemble.json')
-    json_predict_file2 = os.path.join('/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/predict_multimodel_submit_v16/trainval.json')
+    json_predict_file = os.path.join('/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/predict_multimodel_submit_v16/trainval.json')
+    json_predict_file2 = os.path.join('/home/mdisk3/bianzhewu/medical_repertory/miccai2023/LLD-MMRI2023/main/output/predict_multimodel_submit/ensemble.json')
     root_dir = os.path.dirname(json_predict_file2)
 
     combine_multimodel(json_predict_file,json_predict_file2,root_dir)
