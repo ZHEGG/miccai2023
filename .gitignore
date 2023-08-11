@@ -1,3 +1,4 @@
 output/
 pretrained_model/
 vis/
+.vscode/

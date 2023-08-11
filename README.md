@@ -54,15 +54,17 @@ The first output json is ensemble model
 
 command
 
-    predict_submit.py --data_dir {your data path} --val_anno_file root_dir/labels_test_inaccessible.txt --model uniformer_base_original uniformer_small_original uniformer_small_original uniformer_base_original uniformer_base_original uniformer_small_original --checkpoint {fold1.pth.tar fold2.pth.tar fold3.pth.tar fold3.pth.tar fold4.pth.tar fold5.pth.tar} --batch-size 1 --results-dir {your result dir} --team_name {your name} --img_size 16 128 128 --crop_size 14 112 112
+    python predict_submit.py --data_dir {your data path} --val_anno_file root_dir/labels_test_inaccessible.txt --model uniformer_base_original uniformer_small_original uniformer_small_original uniformer_base_original uniformer_base_original uniformer_small_original --checkpoint {fold1.pth.tar fold2.pth.tar small_fold3.pth.tar base_fold3.pth.tar fold4.pth.tar fold5.pth.tar} --batch-size 1 --results-dir {your result dir} --team_name {your name} --img_size 16 128 128 --crop_size 14 112 112
 
 The second output json is the model trained by all trainval data
 
-just change --model and --checkpoint and add --modified
+just change the parameter --model {uniformer_small_original} and give the corresponding --checkpoint {trainval.pt} and add --modified
+
+    python predict_submit.py --data_dir {your data path} --val_anno_file root_dir/labels_test_inaccessible.txt --model uniformer_small_original --checkpoint {trainval.pt} --batch-size 1 --results-dir {your result dir} --team_name {your name} --img_size 16 128 128 --crop_size 14 112 112 --modified
 
 finally we will get the final json by post-processing 2 model outputs using
 
-    postprocess/json_refine.py
+    python postprocess/json_refine.py
 
 # Pretrained model
 The pretrained model can be downloaded by:
