@@ -68,7 +68,7 @@ Finally we will get the final json by post-processing 2 model outputs using
 
     python postprocess/json_refine.py
 
-Noted that json trained by ensemble should be put in first and json trained by all trainval data should be put in second
+Noted that json trained by all trainval data should be put in first and json trained by ensemble should be put in second
 
 # Pretrained model
 The pretrained model can be downloaded by:
