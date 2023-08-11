@@ -224,7 +224,7 @@ class UniFormer_ori(nn.Module):
     def __init__(self, depth=[3, 4, 8, 3], img_size=224, in_chans=3, num_classes=1000, embed_dim=[64, 128, 320, 512],
                  head_dim=64, mlp_ratio=4., qkv_bias=True, qk_scale=None, representation_size=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0., norm_layer=None, conv_stem=False, pretrained_cfg_overlay=None, return_visualization = False,
-                 return_hidden = False):
+                 return_hidden = False, modified = False):
         """
         Args:
             depth (list): depth of each stage
@@ -258,8 +258,13 @@ class UniFormer_ori(nn.Module):
             self.patch_embed4 = middle_embedding(in_channels=embed_dim[2], out_channels=embed_dim[3], stride=(1, 2, 2))
 
         else:
-            self.patch_embed1 = PatchEmbed(
-                img_size=img_size, patch_size=(1, 2, 2), in_chans=in_chans, embed_dim=embed_dim[0])
+            if modified:
+                self.patch_embed1 = PatchEmbed(
+                    img_size=img_size, patch_size=(3, 2, 2), in_chans=in_chans, embed_dim=embed_dim[0])
+                self.patch_embed1.proj = nn.Conv3d(in_chans,embed_dim[0],(3,2,2),(3,2,2),groups=in_chans)
+            else:
+                self.patch_embed1 = PatchEmbed(
+                    img_size=img_size, patch_size=(1, 2, 2), in_chans=in_chans, embed_dim=embed_dim[0])
             self.patch_embed2 = PatchEmbed(
                 img_size=img_size // 4, patch_size=(1, 2, 2), in_chans=embed_dim[0], embed_dim=embed_dim[1])
             self.patch_embed3 = PatchEmbed(
@@ -303,7 +308,14 @@ class UniFormer_ori(nn.Module):
             self.pre_logits = nn.Identity()
 
         # Classifier head
-        self.head = nn.Linear(embed_dim[-1], num_classes) if num_classes > 0 else nn.Identity()
+        if modified:
+            self.head = nn.Sequential(
+                nn.Linear(embed_dim[-1],512),
+                nn.ReLU(),
+                nn.Linear(512,num_classes)
+            ) if num_classes > 0 else nn.Identity()
+        else:
+            self.head = nn.Linear(embed_dim[-1], num_classes) if num_classes > 0 else nn.Identity()
 
         self.return_visualization = return_visualization
         self.return_hidden = return_hidden

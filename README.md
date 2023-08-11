@@ -44,8 +44,11 @@ fold5 for uniformer-small and its confusion matrix as follows
 
 second 
 
-we use all trainval data to chose a model between 100 and 200 epochs based on previous training experience, There will be some randomness, and we will give the model weight of the competition submission
+we use all trainval data to train a model, we save model between 100 and 250 epochs every 10 epochs based on previous training experience, and save a best model according to loss, Then we choose one of them, we also give the model weight of the competition submission
 
+The command for training is
+
+    bash train_alldata.sh
 # Evaluation
 The first output json is ensemble model
 
@@ -55,7 +58,7 @@ command
 
 The second output json is the model trained by all trainval data
 
-just change --model and --checkpoint
+just change --model and --checkpoint and add --modified
 
 finally we will get the final json by post-processing 2 model outputs using
 

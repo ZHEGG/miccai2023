@@ -96,6 +96,7 @@ parser.add_argument('--team_name', default='', type=str,
                     required=True, help='Please enter your team name')
 parser.add_argument('--mode', type=str, default='trilinear', help='interpolate mode (trilinear, tricubic)')
 parser.add_argument('--return_glb', action='store_true', default=False, help='if return_glb_input')
+parser.add_argument('--modified', action='store_true', default=False, help='if use modified uniformer')
 
 def validate(args):
     # might as well try to validate something
@@ -132,6 +133,7 @@ def validate(args):
                 num_classes=args.num_classes,
                 img_size = args.crop_size[-1],
                 pretrained_cfg=None,
+                modified = args.modified,
                 )
             if args.num_classes is None:
                 assert hasattr(
@@ -164,6 +166,7 @@ def validate(args):
             num_classes=args.num_classes,
             img_size = args.crop_size[-1],
             pretrained_cfg=None,
+            modified = args.modified,
                             )
         if args.num_classes is None:
             assert hasattr(
