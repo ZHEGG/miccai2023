@@ -22,25 +22,25 @@ We select 6 models for integration, where fold3 was selected twice because it is
 
 Fold1 for uniformer-base and its confusion matrix as follows
 
-![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold1_confusion_matrix_base.png)
+<img src="https://github.com/ZHEGG/miccai2023/blob/main/image/fold1_confusion_matrix_base.png" width="250" height="400">
 
 Fold2 for uniformer-small and its confusion matrix as follows
 
-![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold2_confusion_matrix_small.png)
+<img src="https://github.com/ZHEGG/miccai2023/blob/main/image/fold2_confusion_matrix_small.png" width="250" height="400">
 
 Fold3 for uniformer-small and uniformer-base and its confusion matrix as follows
 
-![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold3_confusion_matrix_small.png)
+<img src="https://github.com/ZHEGG/miccai2023/blob/main/image/fold3_confusion_matrix_small.png" width="250" height="400">
 
-![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold3_confusion_matrix_base.png)
+<img src="https://github.com/ZHEGG/miccai2023/blob/main/image/fold3_confusion_matrix_base.png" width="250" height="400">
 
 Fold4 for uniformer-base and its confusion matrix as follows
 
-![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold4_confusion_matrix_base.png)
+<img src="https://github.com/ZHEGG/miccai2023/blob/main/image/fold4_confusion_matrix_base.png" width="250" height="400">
 
 Fold5 for uniformer-small and its confusion matrix as follows
 
-![Image text](https://github.com/ZHEGG/miccai2023/blob/main/image/fold5_confusion_matrix_small.png)
+<img src="https://github.com/ZHEGG/miccai2023/blob/main/image/fold5_confusion_matrix_small.png" width="250" height="400">
 
 Second 
 
